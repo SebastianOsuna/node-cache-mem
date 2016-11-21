@@ -1,0 +1,29 @@
+{
+  "name": "cache-mem",
+  "version": "1.0.0",
+  "description": "Redis client with local fallback.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianOsuna/node-cache-mem.git"
+  },
+  "keywords": [
+    "redis",
+    "fallback",
+    "inmemory"
+  ],
+  "author": "SebastianOsuna <jsebastianosuna@hotmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SebastianOsuna/node-cache-mem/issues"
+  },
+  "homepage": "https://github.com/SebastianOsuna/node-cache-mem#readme",
+  "dependencies": {
+    "bluebird": "^3.4.6",
+    "debug": "^2.3.3",
+    "redis": "^2.6.3"
+  }
+}
