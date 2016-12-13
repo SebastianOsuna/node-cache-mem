@@ -13,7 +13,8 @@ class CacheMem {
     this._client = new Redis.createClient({ port: redisPort, host: redisHost, connect_timeout: 1000 });
     this._localMode = false;
     this.localCache = {};
-    
+    this._defaultExpiration = 10;
+
     this._client.on('error', err => {
       if (err.code === 'ECONNREFUSED') {
         this._localMode = true;
@@ -30,8 +31,8 @@ class CacheMem {
     return this._client.getAsync(key)
     .then(val => (val || defaultValue))
     .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);  
-      if (err.code === 'NR_CLOSED') this._localMode = true; 
+      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+      if (err.code === 'NR_CLOSED') this._localMode = true;
       return this.fallbackGet(key, defaultValue);
     });
   }
@@ -68,6 +69,22 @@ class CacheMem {
 
   fallbackSet(key, value) {
     return (this.localCache[key] = value);
+  }
+
+  expire(key, expiration) {
+    if (this._localMode) return this.fallbackExpire(key, expiration || this._defaultExpiration);
+
+    return this._client.expireAsync(key, expiration || this._defaultExpiration)
+    .catch(err => {
+      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+      if (err.code === 'NR_CLOSED') this._localMode = true;
+      return this.fallbackExpire(key, expiration || this._defaultExpiration);
+    });
+  }
+
+  fallbackExpire(key, expiration) {
+    setTimeout(() => delete this.localCache[key], expiration);
+    return (1);
   }
 }
 
