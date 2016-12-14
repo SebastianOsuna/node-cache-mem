@@ -38,7 +38,9 @@ class CacheMem {
   }
 
   fallbackGet(key, defaultValue) {
-    return this.localCache[key] || defaultValue;
+    return new Promise(resolve => {
+      resolve(this.localCache[key] || defaultValue);
+    });
   }
 
   increment(key) {
@@ -53,7 +55,9 @@ class CacheMem {
   }
 
   fallbackIncrement(key) {
-    return ( this.localCache[key] = (this.localCache[key] || 0) + 1 );
+    return new Promise(resolve => {
+      resolve(( this.localCache[key] = (this.localCache[key] || 0) + 1 ));
+    });
   }
 
   set(key, value) {
@@ -68,7 +72,9 @@ class CacheMem {
   }
 
   fallbackSet(key, value) {
-    return (this.localCache[key] = value);
+    return new Promise(resolve => {
+      resolve((this.localCache[key] = value));
+    });
   }
 
   expire(key, expiration) {
@@ -84,7 +90,9 @@ class CacheMem {
 
   fallbackExpire(key, expiration) {
     setTimeout(() => delete this.localCache[key], expiration);
-    return (1);
+    return new Promise(resolve => {
+      resolve(1);
+    });
   }
 }
 
