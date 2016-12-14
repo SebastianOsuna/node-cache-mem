@@ -89,7 +89,7 @@ class CacheMem {
   }
 
   fallbackExpire(key, expiration) {
-    setTimeout(() => delete this.localCache[key], expiration);
+    setTimeout(() => delete this.localCache[key], expiration * 1000); // To miliseconds
     return new Promise(resolve => {
       resolve(1);
     });
