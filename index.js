@@ -14,7 +14,6 @@ class CacheMem {
     this._localMode = false;
     this.localCache = {};
     this._defaultExpiration = 10;
-
     this._client.on('error', err => {
       if (err.code === 'ECONNREFUSED') {
         this._localMode = true;
@@ -92,6 +91,40 @@ class CacheMem {
     setTimeout(() => delete this.localCache[key], expiration * 1000); // To miliseconds
     return new Promise(resolve => {
       resolve(1);
+    });
+  }
+
+  ttl(key) {
+    if (this._localMode) return this.fallbackTll(key);
+
+    return this._client.ttlAsync(key)
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackTll(key);
+      });
+  }
+
+  fallbackTll(key) {
+    return new Promise(resolve => {
+      resolve(this._defaultExpiration);
+    });
+  }
+
+  keys(query) {
+    if (this._localMode) return this.fallbackKeys(query);
+
+    return this._client.keysAsync(query)
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${query}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackKeys(query);
+      });
+  }
+
+  fallbackKeys(query) {
+    return new Promise(resolve => {
+      resolve([]);
     });
   }
 }
