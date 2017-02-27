@@ -13,7 +13,8 @@ class CacheMem {
     this._client = new Redis.createClient({ port: redisPort, host: redisHost, connect_timeout: 1000 });
     this._localMode = false;
     this.localCache = {};
-    
+    this.localTtlCache = {};
+    this._defaultExpiration = 10;
     this._client.on('error', err => {
       if (err.code === 'ECONNREFUSED') {
         this._localMode = true;
@@ -28,46 +29,120 @@ class CacheMem {
     if (this._localMode) return this.fallbackGet(key, defaultValue);
 
     return this._client.getAsync(key)
-    .then(val => (val || defaultValue))
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);  
-      if (err.code === 'NR_CLOSED') this._localMode = true; 
-      return this.fallbackGet(key, defaultValue);
-    });
+      .then(val => (val || defaultValue))
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackGet(key, defaultValue);
+      });
   }
 
   fallbackGet(key, defaultValue) {
-    return this.localCache[key] || defaultValue;
+    return new Promise(resolve => {
+      resolve(this.localCache[key] || defaultValue);
+    });
   }
 
   increment(key) {
     if (this._localMode) return this.fallbackIncrement(key);
 
     return this._client.incrAsync(key)
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackIncrement(key);
-    });
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackIncrement(key);
+      });
   }
 
   fallbackIncrement(key) {
-    return ( this.localCache[key] = (this.localCache[key] || 0) + 1 );
+    return new Promise(resolve => {
+      resolve(( this.localCache[key] = (this.localCache[key] || 0) + 1 ));
+    });
   }
 
   set(key, value) {
     if (this._localMode) return this.fallbackSet(key, value);
 
     return this._client.setAsync(key, value)
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackSet(key, value);
-    });
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackSet(key, value);
+      });
   }
 
   fallbackSet(key, value) {
-    return (this.localCache[key] = value);
+    return new Promise(resolve => {
+      resolve((this.localCache[key] = value));
+    });
+  }
+
+  expire(key, expiration) {
+    if (this._localMode) return this.fallbackExpire(key, expiration || this._defaultExpiration);
+
+    return this._client.expireAsync(key, expiration || this._defaultExpiration)
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackExpire(key, expiration || this._defaultExpiration);
+      });
+  }
+
+  fallbackExpire(key, expiration) {
+    let time = expiration * 1000; //Convert to milliseconds
+    this.localTtlCache[key] = Date.now() + time;
+    setTimeout(() => {
+      delete this.localCache[key];
+      delete this.localTtlCache[key];
+    }, time);
+    return new Promise(resolve => {
+      resolve(1);
+    });
+  }
+
+  ttl(key) {
+    if (this._localMode) return this.fallbackTll(key);
+
+    return this._client.ttlAsync(key)
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackTll(key);
+      });
+  }
+
+  fallbackTll(key) {
+    return new Promise(resolve => {
+      if (!this.localCache[key]) {
+        return resolve(-2);
+      }
+      if (!this.localTtlCache[key]) {
+        return resolve(-1);
+      }
+      let response = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
+      response = Math.round(response/1000);
+      resolve(response);
+    });
+  }
+
+  keys(query) {
+    if (this._localMode) return this.fallbackKeys(query);
+
+    return this._client.keysAsync(query)
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${query}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackKeys(query);
+      });
+  }
+
+  fallbackKeys(query) {
+    let nQuery = new RegExp(query.replace(/\W/g, '').trim(), 'g');
+    return new Promise(resolve => {
+      resolve(Object.keys(this.localCache).filter(key => {
+        return nQuery.test(key);
+      }));
+    });
   }
 }
 
