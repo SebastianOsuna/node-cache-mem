@@ -19,3 +19,16 @@ Set a new `value` for `key`. The setted value is returned.
 ### CacheMem#increment(key) -> Promise
 
 Increments the value at `key` by 1.
+
+### CacheMem#expire(key, expiration) -> Promise
+
+Expire `key` in the indicated `expiration` seconds. Promise resolves to `1`.
+
+### CacheMem#ttl(key) -> Promise
+
+Gets the remaining seconds for the `key` to expire. Promise might resolve to `-2`
+if the key is not set or `-1` if no expiration has been set to the `key`.
+
+### CacheMem#keys(query) -> Promise
+
+Gets all keys that match the given `query` pattern.
