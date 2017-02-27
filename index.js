@@ -13,6 +13,7 @@ class CacheMem {
     this._client = new Redis.createClient({ port: redisPort, host: redisHost, connect_timeout: 1000 });
     this._localMode = false;
     this.localCache = {};
+    this.localTtlCache = {};
     this._defaultExpiration = 10;
     this._client.on('error', err => {
       if (err.code === 'ECONNREFUSED') {
@@ -88,7 +89,12 @@ class CacheMem {
   }
 
   fallbackExpire(key, expiration) {
-    setTimeout(() => delete this.localCache[key], expiration * 1000); // To miliseconds
+    let time = expiration * 1000; //Convert to milliseconds
+    this.localTtlCache[key] = Date.now() + time;
+    setTimeout(() => {
+      delete this.localCache[key];
+      delete this.localTtlCache[key];
+    }, time);
     return new Promise(resolve => {
       resolve(1);
     });
@@ -106,8 +112,9 @@ class CacheMem {
   }
 
   fallbackTll(key) {
+    let ttl = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
     return new Promise(resolve => {
-      resolve(this._defaultExpiration);
+      resolve(ttl);
     });
   }
 
@@ -123,8 +130,15 @@ class CacheMem {
   }
 
   fallbackKeys(query) {
+    let nQuery = new RegExp(query.replace(/\W/g, '').trim(), 'g');
+    let results = [];
+    Object.keys(this.localCache).forEach(key => {
+      if (nQuery.test(key)) {
+        return results.push(key);
+      }
+    });
     return new Promise(resolve => {
-      resolve([]);
+      resolve(results);
     });
   }
 }
