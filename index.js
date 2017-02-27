@@ -112,25 +112,17 @@ class CacheMem {
   }
 
   fallbackTll(key) {
-    let reponse;
-    try {
+    return new Promise(resolve => {
       if (!this.localCache[key]) {
-        throw -2;
+        return resolve(-2);
       }
       if (!this.localTtlCache[key]) {
-        throw -1;
+        return resolve(-1);
       }
-      reponse = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
-      reponse = Math.round(reponse/1000);
-    }
-    catch (err) {
-      reponse = err;
-    }
-    finally {
-      return new Promise(resolve => {
-        resolve(reponse);
-      });
-    }
+      let response = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
+      response = Math.round(response/1000);
+      resolve(response);
+    });
   }
 
   keys(query) {
