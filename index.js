@@ -29,12 +29,12 @@ class CacheMem {
     if (this._localMode) return this.fallbackGet(key, defaultValue);
 
     return this._client.getAsync(key)
-    .then(val => (val || defaultValue))
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackGet(key, defaultValue);
-    });
+      .then(val => (val || defaultValue))
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackGet(key, defaultValue);
+      });
   }
 
   fallbackGet(key, defaultValue) {
@@ -47,11 +47,11 @@ class CacheMem {
     if (this._localMode) return this.fallbackIncrement(key);
 
     return this._client.incrAsync(key)
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackIncrement(key);
-    });
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackIncrement(key);
+      });
   }
 
   fallbackIncrement(key) {
@@ -64,11 +64,11 @@ class CacheMem {
     if (this._localMode) return this.fallbackSet(key, value);
 
     return this._client.setAsync(key, value)
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackSet(key, value);
-    });
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackSet(key, value);
+      });
   }
 
   fallbackSet(key, value) {
@@ -81,11 +81,11 @@ class CacheMem {
     if (this._localMode) return this.fallbackExpire(key, expiration || this._defaultExpiration);
 
     return this._client.expireAsync(key, expiration || this._defaultExpiration)
-    .catch(err => {
-      debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
-      if (err.code === 'NR_CLOSED') this._localMode = true;
-      return this.fallbackExpire(key, expiration || this._defaultExpiration);
-    });
+      .catch(err => {
+        debug('RedisMiss', `CMD:${err.command}:${key}`, `Reason:${err.code}`);
+        if (err.code === 'NR_CLOSED') this._localMode = true;
+        return this.fallbackExpire(key, expiration || this._defaultExpiration);
+      });
   }
 
   fallbackExpire(key, expiration) {
@@ -112,10 +112,25 @@ class CacheMem {
   }
 
   fallbackTll(key) {
-    let ttl = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
-    return new Promise(resolve => {
-      resolve(ttl);
-    });
+    let reponse;
+    try {
+      if (!this.localCache[key]) {
+        throw -2;
+      }
+      if (!this.localTtlCache[key]) {
+        throw -1;
+      }
+      reponse = Math.max((this.localTtlCache[key] || 0) - Date.now(), 0);
+      reponse = Math.round(reponse/1000);
+    }
+    catch (err) {
+      reponse = err;
+    }
+    finally {
+      return new Promise(resolve => {
+        resolve(reponse);
+      });
+    }
   }
 
   keys(query) {
@@ -131,14 +146,10 @@ class CacheMem {
 
   fallbackKeys(query) {
     let nQuery = new RegExp(query.replace(/\W/g, '').trim(), 'g');
-    let results = [];
-    Object.keys(this.localCache).forEach(key => {
-      if (nQuery.test(key)) {
-        return results.push(key);
-      }
-    });
     return new Promise(resolve => {
-      resolve(results);
+      resolve(Object.keys(this.localCache).filter(key => {
+        return nQuery.test(key);
+      }));
     });
   }
 }
